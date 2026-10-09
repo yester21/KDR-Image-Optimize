@@ -139,22 +139,55 @@ class KDR_IO_Converter {
 	public static function environment() {
 		$uploads = wp_get_upload_dir();
 		$backup  = self::backup_dir();
-		$count   = 0;
-
-		if ( $backup && is_dir( $backup ) ) {
-			$found = glob( trailingslashit( $backup ) . '*/*/*' );
-			$count = is_array( $found ) ? count( $found ) : 0;
-		}
+		$stats   = self::dir_stats( $backup );
 
 		return array(
 			'editor'        => self::editor_name(),
 			'webp'          => self::supports_webp(),
 			'upload_dir'    => isset( $uploads['basedir'] ) ? $uploads['basedir'] : '',
+			'upload_url'    => isset( $uploads['baseurl'] ) ? $uploads['baseurl'] : '',
 			'writable'      => ! empty( $uploads['basedir'] ) && wp_is_writable( $uploads['basedir'] ),
 			'backup_dir'    => $backup,
-			'backup_count'  => $count,
+			'backup_url'    => ! empty( $uploads['baseurl'] ) ? trailingslashit( $uploads['baseurl'] ) . 'kdr-originals' : '',
+			'backup_count'  => $stats['count'],
+			'backup_bytes'  => $stats['bytes'],
 			'backup_exists' => $backup && is_dir( $backup ),
 		);
+	}
+
+	/**
+	 * 디렉터리 안의 파일 개수와 총 용량을 구한다.
+	 *
+	 * @param string $dir 절대 경로.
+	 * @return array count, bytes
+	 */
+	public static function dir_stats( $dir ) {
+		$stats = array(
+			'count' => 0,
+			'bytes' => 0,
+		);
+
+		if ( ! $dir || ! is_dir( $dir ) ) {
+			return $stats;
+		}
+
+		try {
+			$iterator = new RecursiveIteratorIterator(
+				new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ),
+				RecursiveIteratorIterator::LEAVES_ONLY
+			);
+
+			foreach ( $iterator as $item ) {
+				if ( $item->isFile() ) {
+					++$stats['count'];
+					$stats['bytes'] += (int) $item->getSize();
+				}
+			}
+		} catch ( Throwable $e ) {
+			return $stats;
+		}
+
+		return $stats;
 	}
 
 	/**
@@ -308,20 +341,22 @@ class KDR_IO_Converter {
 
 		$backup_file = '';
 
-		if ( $same ) {
-			// 같은 포맷으로 압축: 원본을 처리한 뒤 최적화본으로 교체한다.
-			if ( ! $delete ) {
-				$backup_file = self::backup_original( $file );
-				if ( ! $backup_file ) {
-					@unlink( $write_to );
+		// 원본 삭제를 끈 경우에는 언제나 백업 폴더로 옮겨 보관한다.
+		if ( ! $delete ) {
+			$backup_file = self::backup_original( $file );
 
-					return new WP_Error(
-						'kdr_io_backup',
-						__( '원본 보관에 실패하여 변환을 취소했습니다.', 'kdr-image-optimize' )
-					);
-				}
+			if ( ! $backup_file ) {
+				@unlink( $write_to );
+
+				return new WP_Error(
+					'kdr_io_backup',
+					__( '원본을 백업 폴더로 옮기지 못해 변환을 취소했습니다. 업로드 폴더의 쓰기 권한을 확인하세요.', 'kdr-image-optimize' )
+				);
 			}
+		}
 
+		if ( $same ) {
+			// 같은 포맷으로 압축: 임시 파일을 원본 자리로 옮긴다.
 			if ( ! @rename( $write_to, $file ) ) {
 				@unlink( $write_to );
 
@@ -330,7 +365,7 @@ class KDR_IO_Converter {
 
 			$new_file = $file;
 		} else {
-			// WebP 변환: 새 파일을 만들고 설정에 따라 원본을 삭제하거나 그대로 둔다.
+			// WebP 변환: 새 파일을 서빙하고, 원본 삭제가 켜져 있으면 원본을 지운다.
 			$new_file = $target;
 
 			if ( $delete ) {

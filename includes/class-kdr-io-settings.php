@@ -228,7 +228,10 @@ class KDR_IO_Settings {
 			<?php esc_html_e( '변환이 끝나면 원본 파일을 삭제합니다.', 'kdr-image-optimize' ); ?>
 		</label>
 		<p class="description">
-			<?php esc_html_e( '끄면 원본을 보관합니다. WebP 변환을 켠 경우에는 원본이 그 자리에 남아 예전 .png/.jpg 주소도 계속 열립니다. WebP 변환을 끈 경우에는 원본을 uploads/kdr-originals/ 로 옮겨 보관한 뒤 최적화본으로 교체합니다.', 'kdr-image-optimize' ); ?>
+			<?php esc_html_e( '끄면 원본 파일을 삭제하지 않고 아래 경로로 옮겨 보관합니다.', 'kdr-image-optimize' ); ?><br />
+			<code>wp-content/uploads/kdr-originals/년/월/파일명</code><br />
+			<?php esc_html_e( '보관된 원본은 미디어 라이브러리에 나타나지 않고, 웹 주소로도 그대로 열립니다. FTP 나 파일 관리자로 직접 받아 되돌릴 수 있습니다.', 'kdr-image-optimize' ); ?><br />
+			<strong><?php esc_html_e( '주의: 원본이 그대로 남으므로 서버 용량을 거의 2배로 사용합니다.', 'kdr-image-optimize' ); ?></strong>
 		</p>
 		<?php
 	}
@@ -255,6 +258,21 @@ class KDR_IO_Settings {
 				</div>
 			<?php endif; ?>
 
+			<?php if ( empty( $env['writable'] ) ) : ?>
+				<div class="notice notice-error inline">
+					<p><?php esc_html_e( '업로드 폴더에 쓸 수 없습니다. 이 상태로는 이미지 최적화가 동작하지 않습니다.', 'kdr-image-optimize' ); ?></p>
+				</div>
+			<?php endif; ?>
+
+			<?php if ( empty( $settings['delete_original'] ) ) : ?>
+				<div class="notice notice-warning inline">
+					<p>
+						<strong><?php esc_html_e( '원본 삭제가 꺼져 있습니다.', 'kdr-image-optimize' ); ?></strong>
+						<?php esc_html_e( '최적화본과 원본이 함께 저장되므로 업로드 용량이 거의 2배가 됩니다. 아래 원본 백업 사용량을 확인하시고, 원본이 필요 없으면 삭제를 켜세요.', 'kdr-image-optimize' ); ?>
+					</p>
+				</div>
+			<?php endif; ?>
+
 			<h2><?php esc_html_e( '서버 환경', 'kdr-image-optimize' ); ?></h2>
 			<table class="widefat striped" style="max-width:820px">
 				<tbody>
@@ -275,11 +293,29 @@ class KDR_IO_Settings {
 					<tr>
 						<td><strong><?php esc_html_e( '원본 백업 폴더', 'kdr-image-optimize' ); ?></strong></td>
 						<td>
-							<?php if ( $env['backup_exists'] ) : ?>
-								<code><?php echo esc_html( $env['backup_dir'] ); ?></code>
-								— <?php echo esc_html( sprintf( __( '파일 %d개', 'kdr-image-optimize' ), (int) $env['backup_count'] ) ); ?>
+							<code><?php echo esc_html( $env['backup_dir'] ); ?></code>
+							<?php if ( $env['backup_url'] ) : ?>
+								<br /><span class="description"><?php echo esc_html( $env['backup_url'] ); ?></span>
+							<?php endif; ?>
+							<?php if ( ! $env['backup_exists'] ) : ?>
+								<br /><span class="description"><?php esc_html_e( '아직 없음 — 원본 삭제를 끄면 첫 업로드 때 자동으로 만들어집니다.', 'kdr-image-optimize' ); ?></span>
+							<?php endif; ?>
+						</td>
+					</tr>
+					<tr>
+						<td><strong><?php esc_html_e( '원본 백업 사용량', 'kdr-image-optimize' ); ?></strong></td>
+						<td>
+							<?php if ( $env['backup_count'] > 0 ) : ?>
+								<?php
+								printf(
+									/* translators: 1: number of files, 2: total size */
+									esc_html__( '파일 %1$s개 · %2$s', 'kdr-image-optimize' ),
+									esc_html( number_format_i18n( (int) $env['backup_count'] ) ),
+									esc_html( size_format( (int) $env['backup_bytes'], 2 ) )
+								);
+								?>
 							<?php else : ?>
-								<?php esc_html_e( '아직 없음 (원본 삭제를 끄면 자동 생성됩니다)', 'kdr-image-optimize' ); ?>
+								<?php echo esc_html( size_format( 0, 2 ) ); ?>
 							<?php endif; ?>
 						</td>
 					</tr>
