@@ -1,0 +1,26 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 편집기 / IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# 로그 · 임시 파일
+*.log
+*.tmp
+.kdr-tmp.*
+
+# 의존성
+node_modules/
+vendor/
+
+# 빌드 산출물
+*.zip
+dist/
+
+# 워드프레스 배포 시 제외할 개인 설정
+wp-config.php
